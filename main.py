@@ -66,6 +66,11 @@ class CreateOrderDTO(BaseModel):
     items: List[OrderItem]
 
 
+class SetRoleDTO(BaseModel):
+    email: str
+    role: str  # expected values: 'user' | 'admin'
+
+
 # Auth dependency
 async def get_current_user(authorization: Optional[str] = Header(default=None)):
     if not authorization or not authorization.startswith("Bearer "):
@@ -113,6 +118,19 @@ def logout(authorization: Optional[str] = Header(default=None)):
         token = authorization.split(" ", 1)[1]
         db["session"].delete_one({"token": token})
     return {"ok": True}
+
+
+# One-time setup endpoint to set a user's role using a secret header token
+@app.post("/admin/setup/set-role")
+def set_user_role(dto: SetRoleDTO, x_setup_token: Optional[str] = Header(default=None)):
+    setup_token = os.getenv("ADMIN_SETUP_TOKEN", "")
+    if not setup_token or not x_setup_token or x_setup_token != setup_token:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    user = db["user"].find_one({"email": dto.email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    db["user"].update_one({"_id": user["_id"]}, {"$set": {"role": dto.role}})
+    return {"ok": True, "email": dto.email, "role": dto.role}
 
 
 # Menu endpoints
