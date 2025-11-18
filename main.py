@@ -71,6 +71,11 @@ class SetRoleDTO(BaseModel):
     role: str  # expected values: 'user' | 'admin'
 
 
+class SetRoleByIdDTO(BaseModel):
+    user_id: str
+    role: str  # expected values: 'user' | 'admin'
+
+
 # Auth dependency
 async def get_current_user(authorization: Optional[str] = Header(default=None)):
     if not authorization or not authorization.startswith("Bearer "):
@@ -120,7 +125,7 @@ def logout(authorization: Optional[str] = Header(default=None)):
     return {"ok": True}
 
 
-# One-time setup endpoint to set a user's role using a secret header token
+# One-time setup endpoints to set a user's role using a secret header token
 @app.post("/admin/setup/set-role")
 def set_user_role(dto: SetRoleDTO, x_setup_token: Optional[str] = Header(default=None)):
     setup_token = os.getenv("ADMIN_SETUP_TOKEN", "")
@@ -131,6 +136,22 @@ def set_user_role(dto: SetRoleDTO, x_setup_token: Optional[str] = Header(default
         raise HTTPException(status_code=404, detail="User not found")
     db["user"].update_one({"_id": user["_id"]}, {"$set": {"role": dto.role}})
     return {"ok": True, "email": dto.email, "role": dto.role}
+
+
+@app.post("/admin/setup/set-role-by-id")
+def set_user_role_by_id(dto: SetRoleByIdDTO, x_setup_token: Optional[str] = Header(default=None)):
+    setup_token = os.getenv("ADMIN_SETUP_TOKEN", "")
+    if not setup_token or not x_setup_token or x_setup_token != setup_token:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    try:
+        oid = ObjectId(dto.user_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid user_id")
+    user = db["user"].find_one({"_id": oid})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    db["user"].update_one({"_id": oid}, {"$set": {"role": dto.role}})
+    return {"ok": True, "user_id": dto.user_id, "role": dto.role}
 
 
 # Menu endpoints
