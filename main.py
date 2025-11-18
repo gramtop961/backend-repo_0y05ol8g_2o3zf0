@@ -12,12 +12,13 @@ from schemas import User, MenuItem, Order, OrderItem
 
 app = FastAPI()
 
+# CORS: we use Authorization header (no cookies), so we can safely allow all origins without credentials
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
 
 # Helpers
