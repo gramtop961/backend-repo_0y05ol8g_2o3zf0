@@ -42,6 +42,7 @@ class MenuItem(BaseModel):
     description: Optional[str] = Field(None, description="Short description")
     price: float = Field(..., ge=0, description="Price")
     available: bool = Field(True, description="Is available today")
+    category: Optional[str] = Field(None, description="Category (e.g., soup, salad, main, drink, dessert)")
 
 class OrderItem(BaseModel):
     item_id: str

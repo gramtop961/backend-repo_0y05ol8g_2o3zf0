@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timedelta, date as DateType
 from typing import List, Optional
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends, Header, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from bson.objectid import ObjectId
@@ -59,6 +59,7 @@ class CreateMenuItemDTO(BaseModel):
     description: Optional[str] = None
     price: float
     available: bool = True
+    category: Optional[str] = None
 
 
 class CreateOrderDTO(BaseModel):
@@ -103,7 +104,7 @@ def login(dto: LoginDTO):
     token = new_token()
     expires_at = datetime.utcnow() + timedelta(days=7)
     db["session"].insert_one({"user_id": str(user["_id"]), "token": token, "expires_at": expires_at})
-    return {"token": token, "user": {"id": str(user["_id"]), "name": user["name"], "email": user["email"]}}
+    return {"token": token, "user": {"id": str(user["_id"]), "name": user["name"], "email": user["email"], "role": user.get("role", "user")}}
 
 
 @app.post("/auth/logout")
@@ -116,9 +117,12 @@ def logout(authorization: Optional[str] = Header(default=None)):
 
 # Menu endpoints
 @app.get("/menu/today")
-def get_today_menu():
+def get_today_menu(category: Optional[str] = Query(default=None)):
     today = datetime.utcnow().date().isoformat()
-    items = list(db["menuitem"].find({"day": today, "available": True}))
+    query = {"day": today, "available": True}
+    if category:
+        query["category"] = category
+    items = list(db["menuitem"].find(query))
     for it in items:
         it["id"] = str(it.pop("_id"))
     return items
@@ -131,6 +135,19 @@ def create_menu_item(dto: CreateMenuItemDTO, user=Depends(get_current_user)):
     item = MenuItem(**dto.model_dump())
     item_id = create_document("menuitem", item)
     return {"id": item_id}
+
+
+@app.get("/menu")
+def list_menu(day: Optional[str] = Query(default=None), category: Optional[str] = Query(default=None)):
+    query = {}
+    if day:
+        query["day"] = day
+    if category:
+        query["category"] = category
+    items = list(db["menuitem"].find(query).sort("day", -1))
+    for it in items:
+        it["id"] = str(it.pop("_id"))
+    return items
 
 
 # Orders
